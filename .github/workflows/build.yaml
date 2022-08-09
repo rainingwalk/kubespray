@@ -3,11 +3,11 @@ name: Build kubespray images
 
 on:
   push:
-    branches: [main, master, release-*]
+    branches: [main, master, release-*, dev]
     paths-ignore:
       - 'docs/**'
-    tag:
-      - 'v*'
+    # tag:
+    #   - 'v*'
   workflow_dispatch:
 
 env:

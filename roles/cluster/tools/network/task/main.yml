@@ -1,0 +1,19 @@
+- name: script mv to /usr/local/bin/
+  copy:
+    src: calico_check.sh
+    dest: /usr/local/bin/
+    mode: u+x
+    force: no
+
+- name: "create crontab file"
+  file:
+    path: "/var/spool/cron/root"
+    state: touch
+    mode: 0600
+
+- name: NTP | "create cron jobs for other nodes to sync time per hour"
+  lineinfile:
+    dest: "/var/spool/cron/root"
+    regexp: '^/usr/local/bin/calico_check.*$'
+    line: "0 */5 * * * /usr/sbin/bin/calico_check.sh"
+    state: present

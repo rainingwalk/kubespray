@@ -1,0 +1,6 @@
+
+- name: k8s_patches | Enable ssh to node through kubectl
+  template:
+    src: "kubectl-node_shell.j2"
+    dest: "{{ bin_dir }}/kubectl-node_shell"
+    mode: 0755

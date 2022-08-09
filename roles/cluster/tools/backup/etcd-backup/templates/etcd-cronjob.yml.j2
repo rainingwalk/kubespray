@@ -1,0 +1,46 @@
+apiVersion: batch/v1beta1
+kind: CronJob   #cronjob方式
+metadata:
+  name: etcdbackup
+  namespace: kube-system
+spec:
+  schedule: "0/1 * * * *"   #每天备份数据
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            # Same image as in /etc/kubernetes/manifests/etcd.yaml
+            image: "{{ etcd_image_repo }}:{{ etcd_image_tag }}"
+            env:
+            - name: ETCDCTL_API
+              value: "3"
+            command: ["/bin/sh"]
+            args: ["-c", "/usr/local/bin/etcdctl --cacert={{ etcd_cert_dir }}/ca.pem --cert={{ etcd_cert_dir }}/admin-{{ inventory_hostname }}.pem --key={{ etcd_cert_dir }}/admin-{{ inventory_hostname }}-key.pem --endpoints=https://127.0.0.1:2379 snapshot save /data/backup/etcd-snapshot-$(date +%Y-%m-%d_%H:%M:%S_%Z).db"]
+            volumeMounts:
+            - mountPath: {{ etcd_cert_dir }} #将服务器证书位置映射进来
+              name: etcd-certs
+              readOnly: true
+            - mountPath: /backup #证书备份位置映射进来
+              name: backup
+          restartPolicy: OnFailure
+          nodeSelector:
+            node-role.kubernetes.io/master: ""  #节点选择为主节点
+          tolerations:
+          - key: "node-role.kubernetes.io/master" #打taints，为了使pod能够容忍master
+            effect: "NoSchedule"
+          hostNetwork: true
+          volumes:
+          - name: etcd-env
+            hostPath:
+              path: /etc/etcd.env #挂载主机etcd配置文件位置
+              type: DirectoryOrCreate
+          - name: etcd-certs
+            hostPath:
+              path: {{ etcd_cert_dir }} #挂载主机证书文件位置
+              type: DirectoryOrCreate
+          - name: backup
+            hostPath:
+              path: /data/backup/etcd  #备份文件位置
+              type: DirectoryOrCreate

@@ -1,0 +1,28 @@
+- name: New Disk Partition
+  script: disk.sh "{{ disk }}" "{{ mountDir }}" "{{ partition }}" # 执行 disk.sh 参数{{ disk }} mount_disk.yml的disk:  /dev/vdb #磁盘名字
+  register: result
+  become: yes
+  become_method: su
+
+- name: New Disk Format(xfs)
+  filesystem: fstype=xfs dev="{{ partition }}" force=true #分区格式并格式化
+  become: yes
+  become_method: su
+  when: result is succeeded and result.stdout.find('already mount') == -1
+
+- name: Creates mount directory
+  file:
+    path: "{{ mountDir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+  become: yes
+  become_method: su
+  when: result is succeeded and result.stdout.find('already mount') == -1
+
+- name: New Disk Mount # 挂载磁盘并写入/etc/fstab
+  mount: name="{{ mountDir }}" src="{{ partition }}" fstype=xfs state=mounted
+  become: yes
+  become_method: su
+  when: result is succeeded and result.stdout.find('already mount') == -1

@@ -1,0 +1,10 @@
+---
+# - import_playbook: 00-nexus.yml
+- import_playbook: 01-bootstrap.yml
+- import_playbook: 02-bind.yml
+- import_playbook: 03-cluster-etcd.yml
+- import_playbook: 04-cluster-kubernetes.yml
+- import_playbook: 05-cluster-apps.yml
+- import_playbook: 06-custom-apps.yml
+# - import_playbook: 98-rook.yml
+# - import_playbook: 99-report.yml

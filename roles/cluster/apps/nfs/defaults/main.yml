@@ -1,0 +1,30 @@
+---
+
+nfs_rpcbind_state: started
+nfs_rpcbind_enabled: true
+
+nfs_image_repo: erichough/nfs-server
+nfs_image_tag: latest
+
+# for nfs provisioner
+nfs_client_provisioner_image_repo: external_storage/nfs-client-provisioner
+nfs_client_provisioner_image_tag: latest
+
+create_nfs_provisioner: true
+nfs_server_data_dir: /data/nfs
+nfs_provisioner_name: nfs-client
+nfs_storage_classname: nfs-storage
+
+nfs_server_enabled: true
+nfs_server: "{{ groups['nfs']|first }}"
+nfs_server_ip: "{{ hostvars[nfs_server]['access_ip'] | default(hostvars[nfs_server]['ip'] | default(hostvars[nfs_server]['ansible_default_ipv4']['address'])) }}"
+
+nfs_exports_allows: "{{ nfs_server_ip.rsplit('.', 2)[0] }}.0.0/16"
+nfs_exports:
+  - name: NFS_EXPORT_0
+    value: "/nfs  {{ nfs_exports_allows }}(rw,sync,insecure,no_subtree_check,no_root_squash,no_all_squash,fsid=1)"
+
+nfs_port: 2049
+
+nfs_namespace: kube-system
+nfs_svc: "nfs-server.{{ nfs_namespace }}.svc.{{ cluster_name }}"

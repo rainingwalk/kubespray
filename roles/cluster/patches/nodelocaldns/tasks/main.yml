@@ -1,0 +1,51 @@
+ # fix: nodelocaldns跟bind端口冲突
+
+- name: nodelocaldns | check nodelocaldns status.
+  shell: "{{ bin_dir }}/kubectl get pod -n kube-system -o wide|grep 'nodelocaldns'|grep -v ' Running '|awk '{print $7}'"
+  register: pod_status
+  delegate_to: localhost
+  connection: local
+  run_once: yes
+  ignore_errors: true
+
+- name: set fact for pod_status
+  set_fact:
+    nodelocaldns_status: |-
+      {{ hostvars['localhost']['pod_status'].get('stdout_lines') }}
+  ignore_errors: true
+
+- debug: msg="{{ nodelocaldns_status }}"
+  ignore_errors: true
+
+- block:
+  - name: nodelocaldns | stop bind service
+    shell: systemctl stop bind
+    when:
+      - inventory_hostname in groups['bind']
+
+  - name: nodelocaldns | delete unhealthy nodelocaldns pod.
+    shell: "{{ bin_dir }}/kubectl delete pod -n kube-system `{{ bin_dir }}/kubectl get pod -n kube-system -o wide|grep 'nodelocaldns'|grep '{{ item }}'|awk '{print $1}'` --force=true --grace-period=0"
+    with_items: "{{ nodelocaldns_status }}"
+    delegate_to: localhost
+    connection: local
+    run_once: yes
+
+  - name: nodelocaldns | check nodelocaldns status.
+    shell: "{{ bin_dir }}/kubectl get pod -n kube-system -o wide|grep 'nodelocaldns'|grep '{{ item }}'|awk '{print $3}'"
+    register: nodelocaldns_del_status
+    until: nodelocaldns_del_status.stdout == "Running"
+    retries: 3
+    delay: 5
+    with_items: "{{ nodelocaldns_status }}"
+    delegate_to: localhost
+    connection: local
+    run_once: yes
+    ignore_errors: true
+
+  - name: nodelocaldns | start bind service
+    shell: systemctl start bind
+    when:
+      - inventory_hostname in groups['bind']
+
+  ignore_errors: true
+  when: nodelocaldns_status

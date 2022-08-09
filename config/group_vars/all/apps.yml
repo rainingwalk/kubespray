@@ -1,0 +1,107 @@
+## for chrony server run in container
+ntp_enabled: false
+ntp_servers_pool: "ntp1.aliyun.com,ntp2.aliyun.com,ntp3.aliyun.com,ntp4.aliyun.com"
+
+ntp_server: "{{ groups['kube_control_plane']|first }}"
+ntp_server_ip: "{{ hostvars[ntp_server]['access_ip'] | default(hostvars[nfs_server]['ip'] | default(hostvars[ntp_server]['ansible_default_ipv4']['address'])) }}"
+
+## for nfs
+nfs_enabled: true
+nfs_server_enabled: true
+create_nfs_provisioner: true
+nfs_server_data_dir: /data/nfs
+nfs_container_dir: /nfs # nfs容器内路径
+nfs_provisioner_name: nfs-client
+nfs_storage_classname: nfs-storage
+nfs_server: "{{ groups['nfs']|first }}"
+nfs_server_ip: "{{ hostvars[nfs_server]['access_ip'] | default(hostvars[nfs_server]['ip'] | default(hostvars[nfs_server]['ansible_default_ipv4']['address'])) }}"
+nfs_port: 2049
+nfs_namespace: yks
+nfs_client_provisioner_image_repo: "{{ nexus_repo_docker }}/external_storage/nfs-client-provisioner"
+nfs_client_provisioner_image_tag: latest
+nfs_exports_allows: "{{ nfs_server_ip.rsplit('.', 2)[0] }}.0.0/16"
+nfs_exports_args: "(rw,sync,insecure,no_subtree_check,no_root_squash,no_all_squash,fsid=1)"
+nfs_exports:
+  - name: NFS_EXPORT_0
+    value: "/nfs  {{ nfs_exports_allows }}{{ nfs_exports_args }} {{ kube_service_addresses }}{{ nfs_exports_args }} {{ kube_pods_subnet }}{{ nfs_exports_args }}"
+nfs_svc: "nfs-server.{{ nfs_namespace }}.svc.{{ cluster_name }}"
+
+## for kuboard
+# kuboard: only if you set kuboard_enabled: true
+kuboard_enabled: false
+KUBOARD_SERVER_LOGRUS_LEVEL: info  # error / debug / trace
+# KUBOARD_AGENT_KEY 是 Agent 与 Kuboard 通信时的密钥，请修改为一个任意的包含字母、数字的32位字符串，此密钥变更后，需要删除 Kuboard Agent 重新导入。
+KUBOARD_AGENT_KEY: 32b7d6572c6255211b4eec9009e4a816
+
+KUBOARD_SERVER_NODE_PORT: "{{ kube_apiserver_node_port_range.split('-')[0]|int + 80 }}"
+KUBOARD_AGENT_SERVER_UDP_PORT: "{{ kube_apiserver_node_port_range.split('-')[0]|int + 81 }}"
+KUBOARD_AGENT_SERVER_TCP_PORT: "{{ kube_apiserver_node_port_range.split('-')[0]|int + 81 }}"
+
+## nginx
+# nginx_enabled: false
+
+## autoops
+autoops_enabled: true
+autoops_pvc_name: "autoops"
+autoops_nfs_mount_server_dir: "{{ nfs_server_data_dir }}"
+autoops_sql_file: "autoops.sql"
+# autoops_private_key: '' 
+# autoops_public_key: ''
+autoops_namespace: "yks"
+autoops_admin_user: "admin"
+autoops_admin_pass: "Admin8384"
+# autoops_debug: "False"
+autoops_webmin_root_user: "admin"
+autoops_webmin_root_pass: "admin123"
+autoops_bind_master_ip: "{{ bindIps[0] }}"
+autoops_webmin_url: "http://{{ autoops_bind_master_ip }}:10000"
+autoops_bind_ns_domamin: "{{ ns_domain|default('cluster.local') }}"
+autoops_default_ssh_port: "{{ hostvars[groups['all'][0]].get('ansible_ssh_port')|default(22) }}"
+autoops_default_ssh_user: "{{ hostvars[groups['all'][0]].get('ansible_user')|default('root') }}"
+autoops_ingress_db_listen_port: 30088
+autoops_ingress_host: "autoops.developer-center.yyuap.local"
+# autoops_db_host: ""
+# autoops_db_name: ""
+# autoops_db_passwrod: ""
+# autoops_db_port: ""
+# autoops_db_user: ""
+# autoops_redis_host: ""
+# autoops_redis_password: ""
+# autoops_redis_port: ""
+
+## kubeops
+kubeops_enabled: true
+kubeops_namespace: "yks"
+kubeops_appid: "6O7FVf"
+kubeops_appsecret: "dd5c5845cae83bbd5f41524b47193b38"
+kubeops_k8s_base_api_proxy_url: "http://iuap-yks-console.yonbip.svc.{{ ns_domain|default('cluster.local') }}:19881"
+# for login auth, will skip login auth if no kubeops_login_token_url var
+# kubeops_login_token_url: ""
+
+## minio
+minio_enabled: false
+minio_local_path: /data/minio
+minio_groups: |-
+  {% if groups['kube_node']|length|int == 0 %}
+  {{ groups['kube_control_plane'][:4] }}
+  {% else %}
+  {{ groups['kube_node'][:4] }}
+  {% endif %}
+
+## yks-console-dedicated
+yks_console_dedicated_enabled: false
+api_station_enabled: true
+
+# monitor_agent
+monitor_agent_enabled: true
+
+# command_runner Download URLs
+command_runner_enabled: true
+command_runner_port: 19880
+
+# etcdkeeper
+etcdkeeper_enabled: false
+etcdkeeper_listen_port: "{{ kube_apiserver_node_port_range.split('-')[0]|int + 82 }}" # only used when deploy through docker run
+
+# ansible dynamic_inventory
+dynamic_inventory_enabled: false

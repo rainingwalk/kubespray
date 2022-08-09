@@ -1,0 +1,213 @@
+# start label nodes
+- name: Set inventory node label to empty list
+  set_fact:
+    inventory_kube_control_plane_labels: []
+    inventory_kube_node_labels: []
+
+- name: Populate inventory_kube_control_plane_labels
+  set_fact:
+    inventory_kube_control_plane_labels: "{{ inventory_kube_control_plane_labels + [ '%s=%s'|format(item.key, item.value) ] }}"
+  loop: "{{ kube_control_plane_labels|d({})|dict2items }}"
+
+- name: Populate inventory_kube_node_labels
+  set_fact:
+    inventory_kube_node_labels: "{{ inventory_kube_node_labels + [ '%s=%s'|format(item.key, item.value) ] }}"
+  loop: "{{ kube_node_labels|d({})|dict2items }}"
+
+- debug: var=inventory_kube_control_plane_labels
+- debug: var=inventory_kube_node_labels
+
+# label kube_control_plane
+- name: Set inventory_kube_control_plane_labels
+  command: >-
+      {{ bin_dir }}/kubectl label node {{ item[0] }} {{ item[1] }} --overwrite=true
+  with_nested:
+    - "{{ groups['kube_control_plane'] }}"
+    - "{{ inventory_kube_control_plane_labels }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  changed_when: false
+  when:
+  - kube_control_plane_labels is defined
+  - kube_control_plane_labels is mapping
+
+# label kube_node
+- name: Set inventory_kube_node_labels
+  command: >-
+      {{ bin_dir }}/kubectl label node {{ item[0] }} {{ item[1] }} --overwrite=true
+  with_nested:
+    - "{{ groups['kube_node'] }}"
+    - "{{ inventory_kube_node_labels }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  changed_when: false
+  when:
+  - kube_node_labels is defined
+  - kube_node_labels is mapping
+# end for label_nodes
+
+# label ingress
+- name: Set ingress_nginx_nodeselector
+  command: >-
+      {{ bin_dir }}/kubectl label node {{ item[0] }} {{ '%s=%s'|format(i
+      tem[1].key, item[1].value) }} --overwrite=true
+  with_nested:
+    - "{{ groups['ingress'] }}"
+    - "{{ ingress_nginx_nodeselector|d({})|dict2items }}"
+  delegate_to: "{{ groups['kube_control_plane'][0] }}"
+  changed_when: false
+  when:
+  - "'ingress' in groups"
+  - ingress_nginx_nodeselector is defined
+  - ingress_nginx_nodeselector is mapping
+# end for ingress
+
+
+# whether kube_control_plane can be schedulable
+- name: Remove taint from kube_control_plane
+  command: "{{ bin_dir }}/kubectl --kubeconfig {{ kube_config_dir }}/admin.conf taint node {{ inventory_hostname }} {{ item }}"
+  delegate_to: "{{ groups['kube_control_plane'] | first }}"
+  with_items:
+    - "node-role.kubernetes.io/master:NoSchedule-"
+    - "node-role.kubernetes.io/control-plane:NoSchedule-"
+  when: 
+    - enable_master_schedule is defined and enable_master_schedule
+    - inventory_hostname in groups['kube_control_plane']
+  failed_when: false
+
+
+
+## config kubectl env on localhost
+- setup:
+    gather_subset: 'min'
+  tags: 
+    - kubeconfig_localhost
+    - user_init
+
+- name: "set_fact for current_user"
+  set_fact:
+    current_user: "{{ hostvars[inventory_hostname]['ansible_env'].USER }}"
+    current_user_home: "{{ hostvars[inventory_hostname]['ansible_env'].HOME }}"
+  tags: 
+    - kubeconfig_localhost
+    - user_init
+# on kube_control_plane
+- block:
+  - name: "Create {{ current_user_home }}/.kube"
+    become_user: "{{ current_user }}"
+    file:
+      path: "{{ current_user_home }}/.kube"
+      state: directory
+      mode: 0700
+      owner: "{{ current_user }}"
+      group: "{{ current_user }}"
+  - name: "Create {{ current_user_home }}/.kube/config"
+    become: yes
+    copy:
+      remote_src: yes
+      src: /etc/kubernetes/admin.conf
+      dest: "{{ current_user_home }}/.kube/config"
+      mode: 0600
+      owner: "{{ current_user }}"
+      group: "{{ current_user }}"
+  # - name: "Initial helm for user '{{ current_user }}'"
+  #   become_user: "{{ current_user }}"
+  #   command: "{{ item }}"
+  #   changed_when: false
+  #   with_items:
+  #     - "{{ bin_dir }}/helm init --stable-repo-url={{ nexus_repo_charts }} --client-only"
+  - name: "Assign docker access to {{ current_user }}"
+    become: yes
+    user:
+      name: "{{ current_user }}"
+      groups: docker
+      append: yes
+  when: 
+    - is_kube_master
+    - (current_user != 'root') or (ansible_env.SUDO_USER is defined)
+  tags: user_init
+
+# on ansible localhost server
+- block:
+  - name: "Create {{ current_user_home }}/.kube"
+    become_user: "{{ current_user }}"
+    file:
+      path: "{{ current_user_home }}/.kube"
+      state: directory
+      mode: 0700
+      owner: "{{ current_user }}"
+      group: "{{ current_user }}"
+  # copy kubectl and config file to correct dir on ansible host server
+  - name: copy kubectl to /usr/local/bin/ on ansible host
+    copy:
+      src: "{{ artifacts_dir }}/kubectl"
+      dest: "{{ bin_dir }}/kubectl"
+      mode: 0755
+      owner: "{{ current_user }}"
+      group: "{{ current_user }}"
+  # copy kubectl and config file to correct dir on ansible host server
+  - name: copy admin.conf to {{ current_user_home }}/.kube on ansible host
+    copy:
+      src: "{{ artifacts_dir }}/admin.conf"
+      dest: "{{ current_user_home }}/.kube/config"
+      mode: 0600
+      owner: "{{ current_user }}"
+      group: "{{ current_user }}"
+  # edit admin.conf
+  - name: modify admin.conf to api server domain
+    lineinfile:
+      dest: "{{ current_user_home }}/.kube/config"
+      state: present
+      regexp: '(^\s*.server: .*://).*(:.*$)'
+      line: '\1{{ apiserver_loadbalancer_domain_name }}\2'
+      backrefs: yes
+    when: loadbalancer_apiserver is not defined
+  delegate_to: localhost
+  connection: local
+  delegate_facts: yes
+  become: no
+  run_once: yes
+  when:
+    - kubeconfig_localhost
+  tags: kubeconfig_localhost
+
+- name: Fetch ca.crt from master to ansible host
+  fetch:
+    src: "{{ kube_cert_compat_dir }}/ca.crt"
+    dest: "{{ kube_cert_compat_dir }}/ca.crt"
+    flat: yes
+    validate_checksum: no
+  register: copy_ca_result
+  until: copy_ca_result is not failed
+  retries: 20
+  become: no
+  run_once: yes
+  when:
+    - kubeconfig_localhost
+    - "hostvars['localhost']['ansible_env'].get('HOSTNAME') not in groups['kube_control_plane']"
+  tags: kubeconfig_localhost
+
+- name: Create bash auto completion
+  shell: "{{ bin_dir }}/{{ item }} completion bash > /etc/bash_completion.d/{{ item }}"
+  changed_when: false
+  with_items:
+    - kubectl
+    # - helm
+  ignore_errors: true 
+  tags: 
+    - kubeconfig_localhost
+    - user_init
+
+- name: Helm | Fetch helm from master to ansible host server
+  fetch:
+    src: "{{ bin_dir }}/{{item}}"
+    dest: "{{ bin_dir }}/{{item}}"
+    flat: yes
+    with_items:
+      - "helm"
+    validate_checksum: no
+  register: fetch_result
+  until: fetch_result is not failed
+  retries: 5
+  run_once: yes
+  ignore_errors: true
+  when: helm_enabled
+  tags: helm

@@ -1,0 +1,18 @@
+- block:
+  - name: k8s_patches | Create dashboard role bindings file
+    template:
+      src: "{{ item }}.yaml.j2"
+      dest: "{{ kube_config_dir }}/manifests/{{ item }}.yaml"
+    with_items:
+      - dashboard-admin-user
+      - dashboard-admin-cluster-role
+
+  - name: k8s_patches | Apply dashboard role bindings config
+    kube:
+      kubectl: "{{ bin_dir }}/kubectl"
+      filename: "{{ kube_config_dir }}/manifests/{{ item }}.yaml"
+      state: latest
+    with_items:
+      - dashboard-admin-user
+      - dashboard-admin-cluster-role
+  when: inventory_hostname == groups['kube_control_plane'][0]

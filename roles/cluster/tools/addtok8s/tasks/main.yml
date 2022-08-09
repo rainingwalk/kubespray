@@ -1,0 +1,35 @@
+- name: chattr -i for resolv.conf
+  shell: "chattr -i /etc/resolv.conf"
+  tags: bind
+
+- name: copy /etc/resolv.conf to node
+  copy: src="/etc/resolv.conf" dest="/etc/resolv.conf" mode=755
+  tags: bind
+
+- name: copy /etc/yum.conf to node
+  copy: src="/etc/yum.conf" dest="/etc/yum.conf" mode=755
+  tags: yum
+
+- name: copy /etc/yum.repos.yonyou to node
+  copy: src="/etc/yum.repos.yonyou" dest="/etc/" mode=755
+  tags: yum
+
+- name: yum install chrony
+  package:
+    name: chrony
+    state: present
+  tags: time_sync
+
+- name: config chrony client
+  template:
+    src: "chrony.conf.client.j2"
+    dest: "/etc/chrony.conf"
+  tags: time_sync
+
+- name: start chrony service
+  systemd:
+    name: chronyd
+    state: started
+    daemon_reload: yes
+    enabled: yes
+  tags: time_sync

@@ -1,0 +1,33 @@
+ # fix: unexpected error getting claim reference: selfLink was empty, can't make reference 导致pvc无法绑定挂载
+- block:
+  - name: k8s_patches | apiserver | copy kube-apiserver.yaml to /tmp
+    copy: 
+      src: /etc/kubernetes/manifests/kube-apiserver.yaml 
+      dest: /tmp/kube-apiserver.yaml
+      remote_src: true
+    
+  - name: k8s_patches | disable RemoveSelfLink in apiserver
+    lineinfile:
+      dest: /tmp/kube-apiserver.yaml
+      insertafter: '- kube-apiserver'
+      line: '    - --feature-gates=RemoveSelfLink=false'
+      regexp: '^[\s]*- --feature-gates=RemoveSelfLink='
+      backrefs: no
+      # state: present
+
+  - name: k8s_patches | apiserver | copy kube-apiserver.yaml from /tmp
+    copy: 
+      src: /tmp/kube-apiserver.yaml 
+      dest: /etc/kubernetes/manifests/kube-apiserver.yaml
+      mode: 0600
+      remote_src: true
+      
+  - name: k8s_patches | apiserver | wait for the apiserver to be running
+    uri:
+      url: "{{ kube_apiserver_endpoint }}/healthz"
+      validate_certs: no
+    register: result
+    until: result.status == 200
+    retries: 15
+    delay: 10
+  when: inventory_hostname in groups['kube_control_plane']

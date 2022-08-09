@@ -1,0 +1,13 @@
+- name: yum install chrony
+  yum:
+    name: chrony
+    state: present
+
+- name: copy chrony.conf
+  copy:
+    src: /tmp/chrony.conf
+    dest: /etc
+    mode: 0644
+
+- name: start chrony service
+  service: "name=chronyd state=started enabled=yes"

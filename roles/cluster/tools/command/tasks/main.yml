@@ -1,0 +1,5 @@
+- name: execute command
+  script: execut_comm.sh
+  register: result
+
+- debug: msg="命令执行输出：{{ result.stdout_lines }}"

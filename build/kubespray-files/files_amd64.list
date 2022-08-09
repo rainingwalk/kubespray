@@ -1,0 +1,15 @@
+https://get.helm.sh/helm-v3.8.1-linux-amd64.tar.gz
+https://github.com/containerd/containerd/releases/download/v1.4.9/containerd-1.4.9-linux-amd64.tar.gz
+https://github.com/containerd/nerdctl/releases/download/v0.8.1/nerdctl-0.8.1-linux-amd64.tar.gz
+https://github.com/containernetworking/plugins/releases/download/v0.9.1/cni-plugins-linux-amd64-v0.9.1.tgz
+https://github.com/coreos/etcd/releases/download/v3.4.13/etcd-v3.4.13-linux-amd64.tar.gz
+https://github.com/k8sli/kubernetes/releases/download/v1.20.7-patch-1.0/kubeadm-linux-amd64
+https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.20.0/crictl-v1.20.0-linux-amd64.tar.gz
+https://github.com/kubernetes-sigs/mc/amd64/mc.RELEASE.2022-06-11T21-10-36Z
+https://github.com/kubernetes-sigs/minio/releases/download/v4.0.6/kubectl-minio
+https://github.com/projectcalico/calico/archive/v3.18.6.tar.gz
+https://github.com/projectcalico/calicoctl/releases/download/v3.18.6/calicoctl-linux-amd64
+https://pubnexus.yonyoucloud.com/nexus/service/local/repo_groups/raw/content/tools/command_runner/v1.0/amd64/command_runner
+https://storage.googleapis.com/kubernetes-release/release/v1.20.7/bin/linux/amd64/kubeadm
+https://storage.googleapis.com/kubernetes-release/release/v1.20.7/bin/linux/amd64/kubectl
+https://storage.googleapis.com/kubernetes-release/release/v1.20.7/bin/linux/amd64/kubelet

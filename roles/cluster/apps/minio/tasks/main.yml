@@ -1,0 +1,106 @@
+---
+
+- name: Minio | print minio_groups
+  debug: 
+    msg: "minio_groups--> {{ minio_groups }}"
+
+- name: Create directories for creating local PVs
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0777
+  with_items:
+    - "{{ minio_local_path }}/pv-1"
+    - "{{ minio_local_path }}/pv-2"
+    - "{{ minio_local_path }}/pv-3"
+    - "{{ minio_local_path }}/pv-4"
+  when: [inventory_hostname in minio_groups]
+
+- name: Minio | Fetch kubectl-minio from master to ansible host server
+  fetch:
+    src: "{{ bin_dir }}/{{item}}"
+    dest: "{{ bin_dir }}/{{item}}"
+    flat: yes
+    with_items:
+      - "kubectl-minio"
+      - "mc"
+    validate_checksum: no
+  register: kubectl_minio_result
+  until: kubectl_minio_result is not failed
+  retries: 5
+  run_once: yes
+  ignore_errors: true
+  when: 
+    - inventory_hostname == groups['kube_control_plane'][0]
+
+- block:
+  - name: Changing perm of kubectl-minio on localhost
+    file: 
+      dest: "{{ bin_dir }}/{{item}}"
+      mode: a+x
+      with_items:
+        - "kubectl-minio"
+        - "mc"
+
+  - name: Minio | Create addon dir
+    file:
+      path: "{{ kube_config_dir }}/addons/minio"
+      state: directory
+      owner: root
+      group: root
+      mode: 0755
+      recurse: yes
+
+  - name: Minio | Generate yaml file
+    template: 
+      src: "{{ item }}.yaml.j2" 
+      dest: "{{ kube_config_dir }}/addons/minio/{{ item }}.yaml"
+    with_items:
+      - namespace
+      - pv
+      - storageclass
+      - ingress
+      - resourcequota
+      - clusterroles
+
+  - name: Minio | Init minio operator deployment
+    shell: >-
+      {{ bin_dir }}/kubectl minio init
+      --image {{ MINIO_OPERATOR_IMAGE }}
+      --console-image {{ MINIO_CONSOLE_IMAGE }}
+      --default-minio-image {{ MINIO_TENANT_IMAGE }}
+      --default-console-image {{ MINIO_CONSOLE_IMAGE }}
+
+  - name: Minio | Create namespace, pv, storageclass and resourcequota
+    shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/minio/{{ item }}.yaml"
+    with_items:
+      - namespace
+      - pv
+      - storageclass
+      - resourcequota
+      - clusterroles
+
+  - name: Minio | Create default minio tenant
+    vars:
+      minio_node_count: "{{ minio_groups|length }}"
+      minio_volume_count: "{{ minio_node_count | int * 4 }}"
+    shell: >-
+      {{ bin_dir }}/kubectl minio tenant create {{ TENANT_NAME }}
+      --servers {{ minio_node_count }}    
+      --volumes {{ minio_volume_count }}  
+      --capacity {{ CAPACITY_PER_COLUME }} 
+      --namespace {{ TENANT_NAMESPACE }} 
+      --storage-class {{ STORAGE_CLASS_NAME }} 
+      --image {{ MINIO_TENANT_IMAGE }}   
+      --console-image {{ MINIO_CONSOLE_IMAGE }}
+      --tenant-access-key {{ MINIO_ACCESS_KEY }}
+      --tenant-secret-key {{ MINIO_SECRET_KEY }}
+    register: create_tenant
+
+  - name: Minio | Create ingress rules for the minio services
+    shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/minio/ingress.yaml" 
+  delegate_to: localhost
+  connection: local
+  delegate_facts: yes
+  run_once: yes
+  ignore_errors: true

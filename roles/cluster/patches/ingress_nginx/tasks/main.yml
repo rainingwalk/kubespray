@@ -1,0 +1,39 @@
+---
+
+# - name:  K8S_Patch | NGINX Ingress Controller | Create addon dir
+#   file:
+#     path: "{{ kube_config_dir }}/addons/ingress_nginx"
+#     state: directory
+#     owner: root
+#     group: root
+#     mode: 0755
+#   when:
+#     - inventory_hostname == groups['kube_control_plane'][0]
+
+- name:  K8S_Patch | NGINX Ingress Controller | Templates list
+  set_fact:
+    ingress_nginx_templates:
+      - { name: cm-ingress-nginx-logrotate, file: cm-ingress-nginx-logrotate.yml, type: cm }
+      - { name: cm-gpaas-url, file: cm-gpaas-url.yml, type: cm }
+      - { name: ds-nginx-ingress-controller, file: ds-nginx-ingress-controller.yml, type: ds }
+
+- name:  K8S_Patch | NGINX Ingress Controller | Create manifests
+  template:
+    src: "{{ item.file }}.j2"
+    dest: "{{ kube_config_dir }}/addons/ingress_nginx/{{ item.file }}"
+  with_items: "{{ ingress_nginx_templates }}"
+  register: ingress_nginx_manifests
+  when:
+    - inventory_hostname == groups['kube_control_plane'][0]
+
+- name:  K8S_Patch | NGINX Ingress Controller | Apply manifests
+  kube:
+    name: "{{ item.item.name }}"
+    namespace: "{{ ingress_nginx_namespace }}"
+    kubectl: "{{ bin_dir }}/kubectl"
+    resource: "{{ item.item.type }}"
+    filename: "{{ kube_config_dir }}/addons/ingress_nginx/{{ item.item.file }}"
+    state: "latest"
+  with_items: "{{ ingress_nginx_manifests.results }}"
+  when:
+    - inventory_hostname == groups['kube_control_plane'][0]

@@ -1,0 +1,10 @@
+
+TENANT_NAME: "minio-default-tenant"
+CAPACITY_PER_COLUME: "6Gi"   # The total capacity will be VOLUMES_COUNT * CAPACITY_PER_COLUME
+TENANT_NAMESPACE: "minio-default-tenant"
+STORAGE_CLASS_NAME: "local-storage"
+MINIO_OPERATOR_IMAGE: "{{ docker_image_repo }}/middleware/minio-operator:v4.4.23"
+MINIO_CONSOLE_IMAGE: "{{ docker_image_repo }}/middleware/minio-console:v0.18.1"
+MINIO_TENANT_IMAGE: "{{ docker_image_repo }}/middleware/minio-minio:RELEASE.2022-06-11T19-55-32Z"
+MINIO_ACCESS_KEY: "minio-default-tenant"
+MINIO_SECRET_KEY: "Yonyou#123"

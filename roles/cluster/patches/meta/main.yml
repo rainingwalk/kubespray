@@ -1,0 +1,24 @@
+---
+dependencies:
+  - role: patches/apiserver
+    tags:
+      - apiserver
+
+  - role: patches/dashboard
+    when:
+      - dashboard_enabled
+    tags:
+      - dashboard
+
+  - role: patches/ingress_nginx
+    when:
+      - ingress_nginx_enabled
+    tags:
+      - ingress-controller
+
+  # - role: k8s_patches/nodelocaldns
+  #   when:
+  #     - enable_nodelocaldns
+  #   tags:
+  #     - fix_nodelocaldns
+      

@@ -1,0 +1,12 @@
+- name: Set facts
+  set_fact: file_name="kube-master-{{ inventory_hostname }}-{{ansible_date_time.iso8601_basic_short}}.tar.gz"
+
+- name: Backup kube-master
+  archive:
+    format: gz
+    dest: /tmp/{{ file_name }}
+    path:
+    - "/etc/kubernetes"
+
+- name: Copy kube-master backup file to localhost
+  fetch: src=/tmp/{{ file_name }} dest="{{ backup_dir }}/{{ file_name}}" flat=yes

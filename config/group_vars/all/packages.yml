@@ -1,0 +1,9 @@
+global_prerequisites_packages:
+  apt: [htop,telnet,nano,curl,wget,git,lvm2,bash-completion]
+  yum: [htop,telnet,nano,curl,wget,git,lvm2,bash-completion,net-tools,libselinux-python]
+
+# yum: python-openshift
+
+group_prerequisites_packages:
+  apt: [sshpass,ntpdate,nfs-utils]
+  yum: [sshpass,ntpdate,nfs-utils]

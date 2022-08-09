@@ -1,0 +1,57 @@
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: "{{ nfs_namespace }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: nfs-server
+  template:
+    metadata:
+      labels:
+        role: nfs-server
+    spec:
+      # hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: "{{ nfs_server }}"
+      restartPolicy: Always
+      containers:
+      - name: nfs-server
+        image: "{{ nfs_image_repo }}:{{ nfs_image_tag }}"
+        securityContext:
+          capabilities:
+            add: ["SYS_ADMIN", "SYS_MODULE"]
+        env:
+{% for item in nfs_exports %}
+        - name: "{{ item.name }}"
+          value: "{{ item.value }}"
+{% endfor %}
+        # securityContext:
+        #   privileged: true
+        volumeMounts:
+          - mountPath: /nfs
+            name: nfs-data-volume
+          - mountPath: /lib/modules
+            name: lib-modules
+            readOnly: true
+      volumes:
+      - name: nfs-data-volume
+        hostPath:               # <- the folder on the host machine.
+          path: "{{ nfs_server_data_dir }}"
+      - name: lib-modules
+        hostPath:               # <- the folder on the host machine.
+          path: /lib/modules
+    #   affinity:
+    #     nodeAffinity:
+    #       requiredDuringSchedulingIgnoredDuringExecution:
+    #         nodeSelectorTerms:
+    #           - matchExpressions:
+    #             - key: "failure-domain.beta.kubernetes.io/zone"
+    #               operator: In
+    #               values: ["us-east1-b", "us-east1-c"]
+
+

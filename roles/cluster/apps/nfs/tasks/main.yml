@@ -1,0 +1,132 @@
+---
+# - name: Ensure NFS utilities package are installed.
+#   package: name=nfs-utils state=present
+
+# - name: Ensure rpcbind is running as configured.
+#   service:
+#     name: rpcbind
+#     state: "{{ nfs_rpcbind_state }}"
+#     enabled: "{{ nfs_rpcbind_enabled }}"
+
+# 如果NFS宿主机上rpcbind运行的话, 会占用111端口，导致容器启动失败
+- name: Ensure rpcbind is stoped on nfs host server.
+  service:
+    name: rpcbind
+    state: stopped
+    enabled: false
+  run_once: true
+  delegate_to: "{{ nfs_server }}"
+  ignore_errors: true
+
+- name: Ensure rpcbind.socket is stopped
+  service: 
+    name: rpcbind.socket
+    state: stopped 
+    enabled: no
+  run_once: true
+  delegate_to: "{{ nfs_server }}"
+  ignore_errors: true
+  # when: ansible_os_family == "RedHat" and nfs_only_v4
+
+
+# installation
+- name: NFS-server | Ensure nfs_server_data_dir exist
+  file: 
+    path: "{{ nfs_server_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0777'
+    recurse: yes
+  run_once: true
+  delegate_to: "{{ nfs_server }}"
+
+- name: NFS-server | Ensure nfs manifest dir exist
+  file: 
+    path: "{{ kube_config_dir }}/addons/nfs"
+    state: directory
+    mode: '0644'
+    recurse: yes
+  when:
+    - inventory_hostname == groups['kube_control_plane'][0]
+
+- name: NFS-server | create nfs-server manifest file
+  template: src="{{ item }}.yml.j2" dest="{{ kube_config_dir }}/addons/nfs/{{ item }}.yml"
+  with_items:
+    - nfs-ns
+    - nfs-deployment
+    - nfs-svc
+  register: nfs_manifests
+  when:
+    - inventory_hostname == groups['kube_control_plane'][0]
+
+- name: NFS-server | create yaml files for nfs client provisioner
+  template: src="{{ item }}.yml.j2" dest="{{ kube_config_dir }}/addons/nfs/{{ item }}.yml"
+  with_items:
+    - nfs-rbac
+    - nfs-provisioner-deploy
+    - default-storageclass
+  register: nfs_provisioner_manifests
+  when: 
+    - create_nfs_provisioner
+    - inventory_hostname == groups['kube_control_plane'][0]
+
+- name: NFS-server | Apply nfs manifests first
+  shell: >-
+    {{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/nfs/nfs-ns.yml;
+    {{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/nfs/
+  when: inventory_hostname == groups['kube_control_plane'][0]
+
+# - name: NFS-server | wait until nfs server port is listening
+#   wait_for: 
+#     port: "{{ nfs_port }}"
+#     delay: 2
+#   run_once: true
+#   delegate_to: "{{ groups['nfs']|first }}"
+
+
+# 先创建nfs-server deployment, 防止如下报错：
+# ----> starting rpc.nfsd on port tcp://10.233.48.253:2049 with 4 server thread(s)
+# rpc.nfsd: unable to resolve ANYADDR:tcp://10.233.48.253:2049: Unrecognized service
+# rpc.nfsd: unable to set any sockets for nfsd
+# ----> 
+# ----> ERROR: /usr/sbin/rpc.nfsd failed
+# - name: NFS-server | Apply nfs-deployment.yml manifests first
+#   shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/nfs/nfs-deployment.yml"
+#   when: inventory_hostname == groups['kube_control_plane'][0]
+
+# - name: NFS-server | Wait for NFS-server tobe running
+#   shell: "set -o pipefail && {{ bin_dir }}/kubectl get pods -o wide --namespace kube-system | grep ^nfs-server"
+#   args:
+#     executable: /bin/bash
+#   register: nfs_server_pod
+#   until: nfs_server_pod.stdout.find('Running') != -1
+#   retries: 20
+#   delay: 5
+#   when: inventory_hostname == groups['kube_control_plane'][0]
+
+# - name: NFS-server | Apply nfs-svc manifests
+#   shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/nfs/{{ item }}.yml"
+#   with_items:
+#     - nfs-svc
+#   when: inventory_hostname == groups['kube_control_plane'][0]
+
+# - name: NFS-server | Wait for nfs-svc tobe running
+#   shell: "set -o pipefail && {{ bin_dir }}/kubectl get svc -o wide --namespace kube-system | grep ^nfs-server"
+#   args:
+#     executable: /bin/bash
+#   register: nfs_server_svc
+#   until: nfs_server_svc.stdout.find('nfs-server') != -1
+#   retries: 20
+#   delay: 5
+#   when: inventory_hostname == groups['kube_control_plane'][0]
+
+# - name: NFS-provisioner | Apply the nfs provisioner manifests
+#   shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/nfs/{{ item }}.yml"
+#   with_items:
+#     - nfs-rbac
+#     - nfs-provisioner-deploy
+#     - default-storageclass
+#   when:
+#     - create_nfs_provisioner
+#     - inventory_hostname == groups['kube_control_plane'][0]

@@ -1,0 +1,50 @@
+##### for yks reset #####
+- name: Gather facts
+  import_playbook: kubespray/facts.yml
+
+##### reset kubespray #####
+- hosts: etcd:k8s_cluster:calico_rr
+  gather_facts: false
+  environment: "{{ proxy_disable_env }}"
+  roles:
+    - { role: kubespray-defaults}
+    - { role: reset, tags: reset }
+
+##### reset apps #####
+- hosts: k8s_cluster
+  gather_facts: false
+  tasks:
+  - block:
+    - name: reset | delete apps files and directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ minio_local_path }}"
+        - "{{ bin_dir }}/kubectl-minio"
+      ignore_errors: true  # noqa ignore-errors
+    - name: reset | delete apps files and directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ nfs_server_data_dir }}"
+      ignore_errors: true  # noqa ignore-errors
+    - name: reset | stop command-runner services
+      service:
+        name: "{{ item }}"
+        state: stopped
+      with_items:
+        - command_runner.service
+      failed_when: false
+
+    - name: reset | remove command-runner services
+      file:
+        path: "/etc/systemd/system/{{ item }}"
+        state: absent
+      with_items:
+        - command_runner.service
+      ignore_errors: true  # noqa ignore-errors
+
+# todo 需要考虑host执行相关的任务
+

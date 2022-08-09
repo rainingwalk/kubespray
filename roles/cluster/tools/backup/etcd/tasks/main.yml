@@ -1,0 +1,36 @@
+- name: Set facts
+  set_fact:
+    backup_file_name="etcd-snapshot-{{ansible_date_time.iso8601_basic_short}}.db"
+    cert_file_name="etcd-certs-{{ inventory_hostname }}-{{ansible_date_time.iso8601_basic_short}}.tar.gz"
+    etcd_cert_dir="/etc/ssl/etcd/ssl"
+
+- name: Take a etcd snapshot
+  shell: "ETCDCTL_API=3 {{ bin_dir }}/etcdctl snapshot save /tmp/{{ backup_file_name }}"
+  delegate_to: "{{ groups['etcd']|first }}"
+  run_once: true
+  environment:
+    ETCDCTL_API: 3
+    ETCDCTL_ENDPOINTS: "https://127.0.0.1:2379"
+    ETCDCTL_CERT: "{{ etcd_cert_dir }}/admin-{{ inventory_hostname }}.pem"
+    ETCDCTL_KEY: "{{ etcd_cert_dir }}/admin-{{ inventory_hostname }}-key.pem"
+    ETCDCTL_CACERT: "{{ etcd_cert_dir }}/ca.pem"
+
+- name: Fetch etcd backup file to localhost
+  fetch:
+    src: /tmp/{{ backup_file_name }}
+    dest: "{{ backup_dir }}/{{ backup_file_name }}"
+    flat: yes
+  delegate_to: "{{ groups['etcd']|first }}"
+  run_once: true
+
+- name: Backup etct certs to file
+  archive:
+    dest: /tmp/{{ cert_file_name }}
+    path:
+    - "{{etcd_cert_dir}}"
+
+- name: Fetch etcd cert backup file to localhost
+  fetch:
+    src: /tmp/{{ cert_file_name }}
+    dest: "{{ backup_dir }}/{{ cert_file_name }}"
+    flat: yes

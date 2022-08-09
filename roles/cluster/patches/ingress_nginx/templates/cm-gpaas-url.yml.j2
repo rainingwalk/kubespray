@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpaas-url
+  namespace: {{ ingress_nginx_namespace }}
+data:
+  gpaas-confcenter-url: "https://developer.yonyoucloud.com"
+  gpaas-registry-url: "https://developer.yonyoucloud.com"

@@ -1,0 +1,24 @@
+---
+dependencies:      
+  - role: cluster/apps/nodeshell
+    when:
+      - "(inventory_hostname in groups['kube_control_plane']) or 
+        (inventory_hostname not in groups['kube_control_plane'] and inventory_hostname == 'localhost')"
+    tags:
+      - nodeshell
+
+  - role: cluster/apps/nfs
+    when:
+      - nfs_enabled
+    tags:
+      - nfs
+
+  - role: cluster/apps/minio
+    when:
+      - minio_enabled
+    tags:
+      - minio
+
+  - role: cluster/apps/kube-scheduler-extender
+    tags:
+      - kube-scheduler-extender

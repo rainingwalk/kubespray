@@ -1,0 +1,46 @@
+- name: create folder for clean dist scrit
+  file:
+    path: "/opt/scripts"
+    state: directory
+    mode: 0755
+  tags: auto
+
+- name: replace var
+  replace:
+    dest: "{{ role_path }}/files/{{ item }}"
+    regexp: "REGISTRY_URL"
+    replace: "{{ nexus_repo_docker }}"
+  with_items:
+    - clean_for_OP.sh
+  connection: local
+  run_once: true
+  tags: auto
+
+- name: Deploy clean dist script
+  copy: src={{ role_path }}/files/{{ item }} dest=/opt/scripts/{{ item }} mode=755
+  with_items:
+  - clean_for_OP.sh
+  tags: auto
+
+- name: Add cron job for clean dist
+  cron: name="clean dist" job="/opt/scripts/{{ item }}" minute=0 hour=4 month=* weekday=* state=present
+  with_items:
+    - clean_for_OP.sh
+  tags: auto
+
+- name: create folder for clean dist scrit
+  file:
+    path: "/opt/scripts"
+    state: directory
+    mode: 0755
+  tags: manual
+
+- name: Deploy clean dist script
+  copy: src={{ role_path }}/files/{{ item }} dest=/opt/scripts/{{ item }} mode=755
+  with_items:
+  - clean_for_OP.sh
+  tags: manual
+
+- name: 手动执行清理任务
+  shell: /opt/scripts/clean_for_OP.sh {{ days }}
+  tags: manual

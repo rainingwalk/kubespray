@@ -1,0 +1,32 @@
+
+
+# deploy kube-scheduler-extender
+- block:
+  - name: Create /etc/kubernetes/addons/kube-scheduler-extender
+    file:
+      path: "{{ kube_config_dir }}/addons/kube-scheduler-extender"
+      state: directory
+      owner: root
+      group: root
+      mode: 0600
+
+  - name: Write deploy file
+    template: src=system-kube-scheduler.yml.j2 dest={{ kube_config_dir }}/addons/kube-scheduler-extender/system-kube-scheduler.yaml
+
+  - name: Write deploy file
+    template: src=kube-scheduler-extender.yaml.j2 dest={{ kube_config_dir }}/addons/kube-scheduler-extender/kube-scheduler-extender.yaml
+
+  - name: Deploy kube-scheduler-extender
+    shell: "{{ bin_dir }}/kubectl apply -f {{ kube_config_dir }}/addons/kube-scheduler-extender/"
+  connection: local
+  run_once: true
+  # when: '"kube-scheduler-extender" not in pod_info.stdout and kube_scheduler_extender_install == "yes"'
+  ignore_errors: true
+
+- name: modify kube-scheduler.yaml
+  lineinfile:
+    dest: "/etc/kubernetes/manifests/kube-scheduler.yaml"
+    regexp: '.*policy-configmap.*$'
+    insertafter: 'leader-elect'
+    line: '    - --policy-configmap=kube-scheduler-extender'
+    state: present

@@ -61,6 +61,6 @@ grep '_image_name:' ${REPO_ROOT_DIR}/${DOWNLOAD_YML} \
 # echo "${KUBE_IMAGES}" | tr ' ' '\n' | xargs -L1 -I {} \
 # echo 'echo ${kube_image_repo}/{}:${kube_version}' >> ${TEMP_DIR}/generate.sh
 
-# print files.list and images.list
+# # print files.list and images.list
 # bash ${TEMP_DIR}/generate.sh | grep 'https' | sort > ${TEMP_DIR}/files.list
 # bash ${TEMP_DIR}/generate.sh | grep -v 'https' | sort > ${TEMP_DIR}/images.list

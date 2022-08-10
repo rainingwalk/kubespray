@@ -3,13 +3,12 @@ name: Download files and images
 
 on:
   push:
-    branches: [main, master, release-*]
+    branches: [main, master, release-*, dev]
     paths-ignore:
       - 'docs/**'
-    tag:
-      - 'v*'
-  release:
-    branches: [main, master, release-*]
+    # tag:
+    #   - 'v*'
+  workflow_dispatch:
 
 env:
   IMAGE_REGISTRY: "ghcr.io"
